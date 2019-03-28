@@ -1,0 +1,110 @@
+-------------------------------------
+Serveur de VPN sur Raspberry PI
+Étapes d'installation déjà effectuées
+
+Guy Turcotte
+Mars 2019
+-------------------------------------
+
+À retenir:
+
+   - Dans la procédure, le serveur VPN se nomme 'snoopy'
+   - Le mot de passe de l'utilisateur 'pi' sera donné en personne
+   - Les étapes ici-bas (de 1 à 14) son DÉJÀ EFFECTUÉES. L'image de disque
+     ipsec.img est la résultante de ces étapes
+
+1. Téléchargement de l'image de l'OS:
+   https://www.raspberrypi.org/downloads/raspbian/
+   Version "Raspbian Stretch Lite" du 13 novembre 2018
+
+2. Préparation de la carte micro SD pour premier boot:
+   Outil "Etcher" pour inscrire l'image (https://www.balena.io/etcher/)
+   Ajout du fichier "ssh" dans la partition "boot"
+
+3. Insertion de la carte micro SD dans le Raspberry PI et démarrage
+
+4. Premier login sur serveur VPN à partir d'un poste de travail
+   (mode terminal):
+
+   $ ssh pi@raspberrypi
+   password: raspberry
+
+5. Changement des paramètres de base via outil raspi-config (sur serveur VPN):
+
+   - Mot de passe de l'utilisateur pi (Change User Password)
+   - Nom du host (Network Options / N1 Hostname): snoopy
+   - Langage (Localisation Options / I1 Change Locale):
+        -> retrait de en_GB.UTF-8
+        -> ajout de en_CA.UTF-8
+   - Timezone (Localisation Options / I2 Change Timezone): America / Montreal
+   - Minimise l'usage de la ram par le gpu: (Advanced Options / A3 Memory split) : 16M
+
+   - reboot
+
+6. Login:
+
+   $ ssh pi@snoopy
+   password: .....
+
+7. Mise à niveau (sur serveur VPN):
+
+   $ sudo apt update
+   $ sudo apt upgrade
+
+   (Ignorer le warning sur wpasupplicant. On ne l'utilise pas.)
+
+8. Installation des produits nécessaires pour ipsec (sur serveur VPN):
+
+   $ sudo apt install usbmount uuid-runtime ufw
+   $ sudo apt install strongswan strongswan-pki libcharon-extra-plugins
+
+9. Transmission des scripts de génération de clés et de configuration de ipsec:
+
+   A partir du poste de travail:
+
+     $ scp ipsec_tools.tar pi@snoopy:.
+     password: .....
+
+   Sur le serveur VPN:
+
+     $ tar xvf ipsec_tools.tar
+
+10. Préparation de la configuration de ipsec:
+
+    $ cp tools/ipsec.conf /etc
+    $ cp tools/ipsec.secrets /etc
+    $ sudo chown root:root /etc/ipsec.conf
+    $ sudo chown root:root /etc/ipsec.secrets
+    $ sudo chmod 644 /etc/ipsec.conf
+    $ sudo chmod 600 /etc/ipsec.secrets
+
+11. Ajustement des paramètres système pour permettre le routage par le serveur
+    et désactiver ipv6:
+
+    $ sudo cp tools/vpn-server.conf /etc/sysctl.d
+
+12. Configuration de base du firewall:
+
+    $ sudo ufw allow ssh
+    $ sudo ufw allow 500/udp
+    $ sudo ufw allow 4500/udp
+    $ sudo ufw allow 1701/tcp
+    $ sudo ufw enable
+
+13. Arrêt du serveur
+
+    $ sync
+    $ sync
+    $ sudo halt
+
+14. Creation de l'image installable à partir de la carte micro SD:
+
+    Sur un poste de travail linux. On prend une copie de la carte  micro SD,
+    on utilise le script pishrink.sh pour diminuer la grosseur pour obtenir
+    l'image à reproduire sur la carte micro SD cible. Grosseur: ~1.5 GigaOctets.
+    (https://github.com/Drewsif/PiShrink)
+
+    $ sudo dd if=/dev/sdd of=ipsec_orig.img bs=8M
+    $ sudo pishrink.sh ipsec_orig.img ipsec.img
+
+    Le fichier ipsec.img est l'image à copier sur la carte micro SD cible.

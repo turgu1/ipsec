@@ -1,0 +1,212 @@
+-------------------------------------
+Serveur de VPN sur Raspberry PI
+Étapes de configuration
+
+Guy Turcotte
+Mars 2019
+-------------------------------------
+
+À retenir:
+
+   - Dans la procédure, le serveur VPN se nomme 'snoopy'
+   - Le mot de passe de l'utilisateur 'pi' sera donné en personne
+   - Les clés sont valides pour 10 ans
+   - Toutes les commandes se font dans l'application "Terminal" et sont
+     Préfixées avec un "$" dans ce document. Le "$" ne doit pas être
+     saisie (vous saisissez ? 8-).
+
+1. Récupérer le fichier ipsec.img
+
+2. Préparation de la carte micro SD pour premier boot:
+   Outil "Etcher" pour inscrire l'image (https://www.balena.io/etcher/)
+
+   Grâce à l'outil, on copie le fichier ipsec.img sur une carte micro SD.
+   Grosseur minimum de la carte: 4 Gb
+
+3. Trouver les informations suivantes:
+
+   - Adresse IP du serveur DNS local. Fort probablement l'adresse du
+     routeur Internet de la maison. Sur un Mac, on peut la trouver dans
+     System Preferences > Network > Advanced... > DNS
+
+   - Nom de domaine du serveur VPN chez le fournisseur externe DNS. Par exemple:
+     turgu.duckdns.org
+
+4. Login sur serveur VPN:
+
+   Commande sur le poste de travail:
+
+   $ ssh pi@snoopy
+   password: .....
+
+5. Modifier le mot de passe de l'utilisateur pi pour qu'il soit plus robuste:
+
+   (sur serveur VPN)
+   $ passwd
+   Old password: .....
+   New password: .....
+   Verification: .....
+
+6. S'assurer que le serveur VPN aura toujours la même adresse IP:
+
+   La commande suivante permet de trouver l'adresse MAC du serveur:
+
+     (sur serveur VPN)
+     $ sudo ifconfig eth0
+
+   Notez l'adresse MAC et créer une entrée DHCP sur le routeur pour fournir
+   une adresse fixe pour le serveur VPN
+
+   On doit ensuit rebooter pour que le serveur VPN utilise la bonne adresse IP:
+
+     (sur serveur VPN)
+     $ sync
+     $ sync
+     $ reboot
+
+   On se reconnecte et on vérifie que le serveur possède bien l'adresse IP voulue:
+
+     (sur poste de travail):
+     $ ssh pi@snoopy
+
+     Une fois connecté, on effectue la commande suivante:
+
+     (sur serveur VPN)
+     $ sudo ifconfig eth0
+
+7. Modifier le fichier /etc/ipsec.conf, remplacer 10.1.0.1 par l'adresse ip du
+   serveur dns local (voir étape 3)  
+
+   (sur serveur VPN)
+   $ sudo nano /etc/ipsec.conf
+
+8. Modifier le fichier tools/vpn-params.sh pour ajuster les paramètres. Les deux
+   paramètres à modifier principalement sont les suivants:
+
+   - vpn_server_dns_name : Remplacer "turgu.duckdns.org" par votre propre nom
+     de DNS tel que configuré auprès du fournisseur de nom de domaine. Cette 
+     étape est importante pour permettre aux appareils qui
+     accèderont le serveur VPN de s'assurer de son authentification
+     (non répudiation).
+
+   - organisation : choisir un nom autre que "Guy Home"
+
+   (sur serveur VPN)
+   $ sudo nano tools/vpn-params.sh
+
+   Respecter la syntaxe! (Les guillemets sont nécessaires, ne pas ajouter
+   d'espaces).  Vérifier auprès de l'auteur si vous désirez modifier les
+   autres paramètres...
+
+9. Génération des clés publiques / privées du serveur et de l'autorité de
+   certification (devrait être exécuté une seule fois):
+
+   a) Création de l'autorité de certification (Certificate Authority ou CA):
+
+      (sur serveur VPN)
+      $ sudo tools/create-ca.sh
+
+   b) Création du serveur VPN:
+
+      (sur serveur VPN)
+      $ sudo tools/create-server.sh
+
+   Note: Le fichier généré /etc/ipsec.d/private/caHomeKey.pem doit être
+   absolument protégé car ont peut générer de nouvelle clés d'accès au serveur
+   en utilisant cette clé. L'idéal est de le copier sur une barrette
+   non-connectée lorsque la génération des clés est complétée.
+
+10. Génération des clés et codes d'accès pour chaque utilisateur:
+
+   a) Création des clés publiques / privées pour un utilisateur:
+
+     (sur serveur VPN)
+     $ sudo tools/create-client.sh
+
+     Quatre informations doivent être fournies:
+
+       i.   Le nom au long de l'utilisateur
+       ii.  L'identifiant qui servira à générer le nom de fichier (exemple: bob)
+       iii. Un mot de passe (ou phrase si vous le désirez) pour protéger la clé
+            générée. Ce mot de passe servira à installer le certificat sur les
+            appareils.
+       iv.  L'identifiant d'utilisateur pour l'authentification (exemple: bob)
+
+   b) Création du code d'accès utilisateur:
+
+     $ sudo nano /etc/ipsec.secrets
+
+     ajouter une ligne similaire à la suivante:
+
+          bob : XAUTH "le-mot-de-passe"
+
+     Remplacer 'bob' par le nom donné lors de la création des clé lorsque
+     demandé à l'étape précédante (information iv de la liste ci-haut).
+
+     Le mot de passe doit être entre guillemets. Ce mot de passe sera nécessaire
+     lors du lancement de l'accès au serveur VPN sur l'appareil distant.
+
+11. Relancer le service ipsec
+
+    $ sudo service ipsec restart
+
+    Nécessaire à toutes les fois qu'on modifie les paramètres ou ajoute un
+    utilisateur.
+
+12. Configurer le routeur pour connecter les ports suivants en provenance du
+    réseau internet vers le serveur VPN dont l'adresse IP a été fixée à
+    l'étape 6:
+
+      port 500 UDP
+      port 4500 UDP
+      port 1701 TCP
+
+13. Installation sur les appareils clients (OSX et IOS):
+
+    Dans le répertoire /root, on trouvera des fichiers avec extension '.mobileconfig'
+
+    On doit récupérer deux fichiers pour chaque client:
+
+      1. Le fichier décrivant le certificat publique de l'autorité de certification:
+
+        /root/caHomeCert.mobileconfig
+
+      2. Le fichier décrivant le certificat (clé privée) de l'utilisateur, par exemple,
+         pour bob:
+
+        /root/bob.mobileconfig
+
+    Ces fichiers sont du texte qu'on peut récupérer facilement en les listant
+    à l'écran:
+
+      (sur serveur VPN)
+      $ sudo cat /root/caHomeCert.mobileconfig
+
+    On peut ensuite, via copier/coller, recréer les fichiers localement sur
+    le poste de travail avec les même noms. Dans un autre écran terminal local:
+
+      (sur poste de travail local)
+      $ cat >caHomeCert.mobileconfig
+      <Command-V>
+      <Ctrl-D>
+
+    Répéter la procédure pour le second fichier (bob.mobileconfig)
+
+    Sur OSX:
+
+      Double Cliquer sur chacun des fichiers dans le Finder pour lancer
+      l'installation. Répondre aux questions...
+
+    Sur IOS:
+
+      Transmettre les fichiers comme attachements dans un courriel, Messages ou Dropbox.
+
+      Chacun des fichiers doit être installé comme suit:
+
+        1. Cliquer sur un seul des deux fichiers du courriel
+        2. Aller dans l'application "System Preferences"
+        3. Dans la colonne de gauche apparaîtra dans le haut une nouvelle entrée
+           permettant de procéder à l'installation d'un 'payload'. Répondre aux
+           questions...
+
+       Répéter pour le second fichier.
