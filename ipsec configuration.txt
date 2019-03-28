@@ -14,6 +14,10 @@ Mars 2019
    - Toutes les commandes se font dans l'application "Terminal" et sont
      Préfixées avec un "$" dans ce document. Le "$" ne doit pas être
      saisie (vous saisissez ? 8-).
+   - Un aspect qui n’est pas couvert dans la procédure: les automatismes
+     de mise à jour auprès du fournisseur de nom de domaine lorsque l’adresse
+     IP du réseau de la maison change. Comme cette procédure est spécifique 
+     à chaque fournisseur, il faut adapter le serveur en fonction de celui-ci...
 
 1. Récupérer le fichier ipsec.img
 
