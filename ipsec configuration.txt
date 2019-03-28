@@ -34,7 +34,7 @@ Mars 2019
      System Preferences > Network > Advanced... > DNS
 
    - Nom de domaine du serveur VPN chez le fournisseur externe DNS. Par exemple:
-     turgu.duckdns.org
+     toto.duckdns.org
 
 4. Login sur serveur VPN:
 
@@ -87,7 +87,7 @@ Mars 2019
 8. Modifier le fichier tools/vpn-params.sh pour ajuster les paramètres. Les deux
    paramètres à modifier principalement sont les suivants:
 
-   - vpn_server_dns_name : Remplacer "turgu.duckdns.org" par votre propre nom
+   - vpn_server_dns_name : Remplacer "toto.duckdns.org" par votre propre nom
      de DNS tel que configuré auprès du fournisseur de nom de domaine. Cette 
      étape est importante pour permettre aux appareils qui
      accèderont le serveur VPN de s'assurer de son authentification
