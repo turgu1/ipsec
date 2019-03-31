@@ -73,10 +73,10 @@ Mars 2019
      (sur poste de travail):
      $ ssh pi@snoopy
 
-     Une fois connecté, on effectue la commande suivante:
+     Une fois connecté, on effectue la commande suivante pour vérifier si l'adresse IP est la bonne:
 
      (sur serveur VPN)
-     $ sudo ifconfig eth0
+     $ sudo ifconfig eth0 | grep inet
 
 7. Modifier le fichier /etc/ipsec.conf, remplacer 10.1.0.1 par l'adresse ip du
    serveur dns local (voir étape 3)  
@@ -154,10 +154,18 @@ Mars 2019
 
     $ sudo service ipsec restart
 
-    Nécessaire à toutes les fois qu'on modifie les paramètres ou ajoute un
+    Nécessaire à toutes les fois qu'on modifie les paramètres de ipsec ou ajoute un
     utilisateur.
 
-12. Configurer le routeur pour connecter les ports suivants en provenance du
+12. Permettre au serveur VPN de jouer son rôle de routeur en autorisant la transmission des
+    paquets comme routeur dans le firewall ainsi que le passage des protocoles DNS et NTP:
+    
+      $ sudo ufw allow 53/tcp
+      $ sudo ufw allow 53/udp
+      $ sudo ufw allow 123/udp
+      $ sudo ufw default allow FORWARD
+      
+13. Configurer le routeur pour connecter les ports suivants en provenance du
     réseau internet vers le serveur VPN dont l'adresse IP a été fixée à
     l'étape 6:
 
@@ -165,7 +173,7 @@ Mars 2019
       port 4500 UDP
       port 1701 TCP
 
-13. Installation sur les appareils clients (OSX et IOS):
+14. Installation sur les appareils clients (OSX et IOS):
 
     Dans le répertoire /root, on trouvera des fichiers avec extension '.mobileconfig'
 
@@ -214,3 +222,35 @@ Mars 2019
            questions...
 
        Répéter pour le second fichier.
+
+15. Copie de sureté de la clé privée de l'autorité de certification
+
+    Il est préférable de ne pas laisser sur le serveur VPN la clé privée de l'autorité de
+    certification car celle-ci permet de générer de nouvelles clés publique/privée de postes
+    clients. La procédure décrite ici permet de la conserver sur une barrette USB. Comme
+    deux protections valent mieux qu'un, on peut même la copier sur deux barrettes différentes pour
+  
+    i. Insérer une barrette de mémoire usb dans un des ports du raspberry pi
+        
+    ii. Effectuer la commande suivante
+    
+        (sur serveur VPN)
+        $ sudo cp /etc/ipsec.d/private/caHomeKey.pem /media/usb
+        
+    iii. On s'assure que le fichier a bien été copié
+    
+        (sur serveur VPN)
+        $ sudo ls /media/usb
+        
+    iv. On éjecte logiquement la barette usb:
+    
+        (sur serveur VPN)
+        $ sudo umount /media/usb0
+        
+    v. Prendre la barrette et l'insérer dans un poste de travail. Vérifier que le fichier 
+       caHomeKey.pem est bien présent.
+        
+    vi. On peut effacer la clé sur le serveur VPN si le fichier est bien sur la barrette:
+    
+        (sur serveur VPN)
+        $ sudo rm /etc/ipsec.d/private/caHomeKey.pem
